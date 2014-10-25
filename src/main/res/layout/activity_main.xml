@@ -1,22 +1,86 @@
-<LinearLayout
+<FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:paddingLeft="@dimen/activity_horizontal_margin"
-    android:paddingRight="@dimen/activity_horizontal_margin"
-    android:paddingTop="@dimen/activity_vertical_margin"
-    android:paddingBottom="@dimen/activity_vertical_margin"
-    android:gravity="center_horizontal"
-    android:orientation="vertical"
-    tools:context=".TelecineActivity"
     >
 
-  <Button
-      android:id="@+id/launch"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/launch"
-      />
+  <LinearLayout
+      android:id="@+id/main"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:padding="@dimen/outer_margin"
+      android:gravity="center_horizontal"
+      android:orientation="vertical"
+      tools:context=".TelecineActivity"
+      >
 
-</LinearLayout>
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="vertical"
+        >
+      <Button
+          android:id="@+id/launch"
+          android:layout_width="match_parent"
+          android:layout_height="wrap_content"
+          android:padding="24dp"
+          android:text="@string/launch"
+          />
+    </LinearLayout>
+
+    <Button
+        android:id="@+id/view_tutorial"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:paddingStart="25dp"
+        android:paddingEnd="25dp"
+        android:text="@string/view_tutorial"
+        android:textAllCaps="false"
+        android:textColor="?android:attr/textColorSecondary"
+        android:background="?android:attr/selectableItemBackground"
+        />
+
+  </LinearLayout>
+
+  <LinearLayout
+      android:id="@+id/tutorial"
+      android:layout_width="match_parent"
+      android:layout_height="match_parent"
+      android:orientation="vertical"
+      android:background="?android:attr/colorPrimary"
+      >
+    <android.support.v4.view.ViewPager
+        android:id="@+id/tutorial_pager"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        />
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        style="?android:attr/buttonBarStyle"
+        >
+      <Button
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:text="Skip"
+          android:textColor="?android:attr/textColorSecondaryInverse"
+          style="?android:attr/buttonBarButtonStyle"
+          />
+      <Button
+          android:layout_width="0dp"
+          android:layout_height="match_parent"
+          android:layout_weight="1"
+          android:text="Next"
+          android:textColor="?android:attr/textColorSecondaryInverse"
+          style="?android:attr/buttonBarButtonStyle"
+          />
+    </LinearLayout>
+  </LinearLayout>
+
+</FrameLayout>
