@@ -1,32 +1,48 @@
 package com.jakewharton.telecine;
 
-import android.app.Activity;
 import android.app.ActivityManager;
+import android.app.ActivityManager.TaskDescription;
 import android.content.Intent;
-import android.content.res.Resources;
 import android.graphics.Bitmap;
-import android.graphics.drawable.BitmapDrawable;
+import android.graphics.Canvas;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v7.app.AppCompatActivity;
+import android.view.View;
 import android.widget.Spinner;
 import android.widget.Switch;
+import butterknife.BindColor;
+import butterknife.BindString;
+import butterknife.BindView;
 import butterknife.ButterKnife;
-import butterknife.InjectView;
 import butterknife.OnCheckedChanged;
 import butterknife.OnClick;
 import butterknife.OnItemSelected;
 import butterknife.OnLongClick;
 import com.google.android.gms.analytics.HitBuilders;
-import javax.inject.Inject;
 import timber.log.Timber;
 
-public final class TelecineActivity extends Activity {
-  @InjectView(R.id.spinner_video_size_percentage) Spinner videoSizePercentageView;
-  @InjectView(R.id.switch_show_countdown) Switch showCountdownView;
-  @InjectView(R.id.switch_hide_from_recents) Switch hideFromRecentsView;
+import javax.inject.Inject;
+
+import static android.graphics.Bitmap.Config.ARGB_8888;
+
+public final class TelecineActivity extends AppCompatActivity {
+  @BindView(R.id.spinner_video_size_percentage) Spinner videoSizePercentageView;
+  @BindView(R.id.switch_show_countdown) Switch showCountdownView;
+  @BindView(R.id.switch_hide_from_recents) Switch hideFromRecentsView;
+  @BindView(R.id.switch_recording_notification) Switch recordingNotificationView;
+  @BindView(R.id.switch_show_touches) Switch showTouchesView;
+  @BindView(R.id.launch) View launchView;
+
+  @BindString(R.string.app_name) String appName;
+  @BindColor(R.color.primary_normal) int primaryNormal;
 
   @Inject @VideoSizePercentage IntPreference videoSizePreference;
   @Inject @ShowCountdown BooleanPreference showCountdownPreference;
   @Inject @HideFromRecents BooleanPreference hideFromRecentsPreference;
+  @Inject @RecordingNotification BooleanPreference recordingNotificationPreference;
+  @Inject @ShowTouches BooleanPreference showTouchesPreference;
 
   @Inject Analytics analytics;
 
@@ -36,17 +52,14 @@ public final class TelecineActivity extends Activity {
   @Override protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
 
-    Resources res = getResources();
-    String taskName = res.getString(R.string.app_name);
-    Bitmap taskIcon =
-        ((BitmapDrawable) res.getDrawable(R.drawable.ic_videocam_white_48dp)).getBitmap();
-    int taskColor = res.getColor(R.color.primary_normal);
-    setTaskDescription(new ActivityManager.TaskDescription(taskName, taskIcon, taskColor));
-
     ((TelecineApplication) getApplication()).inject(this);
 
     setContentView(R.layout.activity_main);
-    ButterKnife.inject(this);
+    ButterKnife.bind(this);
+
+    CheatSheet.setup(launchView);
+
+    setTaskDescription(new TaskDescription(appName, rasterizeTaskIcon(), primaryNormal));
 
     videoSizePercentageAdapter = new VideoSizePercentageAdapter(this);
 
@@ -56,6 +69,22 @@ public final class TelecineActivity extends Activity {
 
     showCountdownView.setChecked(showCountdownPreference.get());
     hideFromRecentsView.setChecked(hideFromRecentsPreference.get());
+    recordingNotificationView.setChecked(recordingNotificationPreference.get());
+    showTouchesView.setChecked(showTouchesPreference.get());
+  }
+
+  @NonNull private Bitmap rasterizeTaskIcon() {
+    Drawable drawable = getResources().getDrawable(R.drawable.ic_videocam_white_24dp, getTheme());
+
+    ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+    int size = am.getLauncherLargeIconSize();
+    Bitmap icon = Bitmap.createBitmap(size, size, ARGB_8888);
+
+    Canvas canvas = new Canvas(icon);
+    drawable.setBounds(0, 0, size, size);
+    drawable.draw(canvas);
+
+    return icon;
   }
 
   @OnClick(R.id.launch) void onLaunchClicked() {
@@ -122,6 +151,36 @@ public final class TelecineActivity extends Activity {
     }
   }
 
+  @OnCheckedChanged(R.id.switch_recording_notification) void onRecordingNotificationChanged() {
+    boolean newValue = recordingNotificationView.isChecked();
+    boolean oldValue = recordingNotificationPreference.get();
+    if (newValue != oldValue) {
+      Timber.d("Recording notification preference changing to %s", newValue);
+      recordingNotificationPreference.set(newValue);
+
+      analytics.send(new HitBuilders.EventBuilder() //
+          .setCategory(Analytics.CATEGORY_SETTINGS)
+          .setAction(Analytics.ACTION_CHANGE_RECORDING_NOTIFICATION)
+          .setValue(newValue ? 1 : 0)
+          .build());
+    }
+  }
+
+  @OnCheckedChanged(R.id.switch_show_touches) void onShowTouchesChanged() {
+    boolean newValue = showTouchesView.isChecked();
+    boolean oldValue = showTouchesPreference.get();
+    if (newValue != oldValue) {
+      Timber.d("Show touches preference changing to %s", newValue);
+      showTouchesPreference.set(newValue);
+
+      analytics.send(new HitBuilders.EventBuilder() //
+          .setCategory(Analytics.CATEGORY_SETTINGS)
+          .setAction(Analytics.ACTION_CHANGE_SHOW_TOUCHES)
+          .setValue(newValue ? 1 : 0)
+          .build());
+    }
+  }
+
   @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
     if (!CaptureHelper.handleActivityResult(this, requestCode, resultCode, data, analytics)) {
       super.onActivityResult(requestCode, resultCode, data);
@@ -130,8 +189,7 @@ public final class TelecineActivity extends Activity {
 
   @Override protected void onStop() {
     super.onStop();
-
-    if (hideFromRecentsPreference.get()) {
+    if (hideFromRecentsPreference.get() && !isChangingConfigurations()) {
       Timber.d("Removing task because hide from recents preference was enabled.");
       finishAndRemoveTask();
     }

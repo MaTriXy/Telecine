@@ -1,13 +1,13 @@
 // Manifest version information!
 def versionMajor = 1
-def versionMinor = 0
-def versionPatch = 0
+def versionMinor = 5
+def versionPatch = 1
 def versionBuild = 0 // bump for dogfood builds, public betas, etc.
 
 buildscript {
   dependencies {
-    classpath 'com.android.tools.build:gradle:1.0.0'
-    classpath 'com.neenbedankt.gradle.plugins:android-apt:1.4'
+    classpath 'com.android.tools.build:gradle:2.1.0'
+    classpath 'com.neenbedankt.gradle.plugins:android-apt:1.8'
   }
 }
 
@@ -22,25 +22,20 @@ apply plugin: 'com.android.application'
 apply plugin: 'com.neenbedankt.android-apt'
 
 android {
-  compileSdkVersion 21
-  buildToolsVersion '21.1.1'
+  compileSdkVersion 23
+  buildToolsVersion '23.0.3'
 
   defaultConfig {
     applicationId 'com.jakewharton.telecine'
 
     minSdkVersion 21
-    targetSdkVersion 21
+    targetSdkVersion 22
 
     versionCode versionMajor * 1000000 + versionMinor * 10000 + versionPatch * 100 + versionBuild
     versionName "${versionMajor}.${versionMinor}.${versionPatch}"
 
     buildConfigField "String", "BUGSNAG_KEY", "\"${getBugsnagKey()}\""
     buildConfigField "String", "ANALYTICS_KEY", "\"${getAnalyticsKey()}\""
-
-    // Resource language filters
-    resConfigs "en"
-    // Resource density filters
-    resConfigs "nodpi", "mdpi", "hdpi", "xhdpi", "xxhdpi", "xxxhdpi"
   }
 
   compileOptions {
@@ -49,7 +44,10 @@ android {
   }
 
   lintOptions {
-    abortOnError false
+    textReport true
+    textOutput 'stdout'
+    warning 'MissingTranslation'
+    warning 'ResourceType' // TODO remove when updated to Butter Knife 8.0.
   }
 
   dexOptions {
@@ -74,11 +72,15 @@ android {
 }
 
 dependencies {
-  compile 'com.android.support:support-annotations:21.0.0'
-  compile 'com.google.android.gms:play-services-base:6.5.87'
-  compile 'com.jakewharton:butterknife:6.0.0'
-  compile 'com.jakewharton.timber:timber:2.5.0'
-  compile 'com.bugsnag:bugsnag-android:3.2.2'
-  compile 'com.squareup.dagger:dagger:1.2.2'
-  apt 'com.squareup.dagger:dagger-compiler:1.2.2'
+  compile 'com.android.support:support-annotations:23.4.0'
+  compile 'com.android.support:design:23.4.0'
+  compile 'com.google.android.gms:play-services-analytics:9.0.1'
+  compile 'com.jakewharton:butterknife:8.0.1'
+  apt 'com.jakewharton:butterknife-compiler:8.0.1'
+  compile 'com.jakewharton.timber:timber:4.1.2'
+  compile 'com.bugsnag:bugsnag-android:3.4.0'
+  compile 'com.squareup.dagger:dagger:1.2.5'
+  apt 'com.squareup.dagger:dagger-compiler:1.2.5'
+  testCompile 'junit:junit:4.12'
+  testCompile 'com.google.truth:truth:0.28'
 }
