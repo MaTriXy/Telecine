@@ -3,8 +3,6 @@ package com.jakewharton.telecine;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
-import android.content.BroadcastReceiver;
-import android.content.ContentResolver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.Configuration;
@@ -49,6 +47,8 @@ import static android.hardware.display.DisplayManager.VIRTUAL_DISPLAY_FLAG_PRESE
 import static android.media.MediaRecorder.OutputFormat.MPEG_4;
 import static android.media.MediaRecorder.VideoEncoder.H264;
 import static android.media.MediaRecorder.VideoSource.SURFACE;
+import static android.os.Build.VERSION.SDK_INT;
+import static android.os.Build.VERSION_CODES.M;
 import static android.os.Environment.DIRECTORY_MOVIES;
 import static android.widget.Toast.LENGTH_SHORT;
 
@@ -59,6 +59,9 @@ final class RecordingSession {
   private static final String MIME_TYPE = "video/mp4";
 
   interface Listener {
+    /** Invoked before {@link #onStart()} to prepare UI before recording. */
+    void onPrepare();
+
     /** Invoked immediately prior to the start of recording. */
     void onStart();
 
@@ -115,12 +118,16 @@ final class RecordingSession {
     projectionManager = (MediaProjectionManager) context.getSystemService(MEDIA_PROJECTION_SERVICE);
   }
 
-  public void showOverlay() {
+  void showOverlay() {
     Timber.d("Adding overlay view to window.");
 
     OverlayView.Listener overlayListener = new OverlayView.Listener() {
       @Override public void onCancel() {
         cancelOverlay();
+      }
+
+      @Override public void onPrepare() {
+        listener.onPrepare();
       }
 
       @Override public void onStart() {
@@ -271,6 +278,7 @@ final class RecordingSession {
         listener.onStop();
       } catch (RuntimeException e) {
         if (propagate) {
+          //noinspection ThrowFromFinallyBlock
           throw e; // Only allow listener exceptions to propagate if stopped successfully.
         }
       }
@@ -363,11 +371,15 @@ final class RecordingSession {
       }
 
       @Override protected void onPostExecute(@Nullable Bitmap bitmap) {
-        if (bitmap != null) {
+        if (bitmap != null && !notificationDismissed()) {
           showNotification(uri, bitmap);
         } else {
           listener.onEnd();
         }
+      }
+
+      private boolean notificationDismissed() {
+        return SDK_INT >= M && notificationManager.getActiveNotifications().length == 0;
       }
     }.execute();
   }
@@ -431,32 +443,10 @@ final class RecordingSession {
     return Bitmap.createBitmap(bitmap, x, y, width, height, null, true);
   }
 
-  public void destroy() {
+  void destroy() {
     if (running) {
       Timber.w("Destroyed while running!");
       stopRecording();
-    }
-  }
-
-  public static final class DeleteRecordingBroadcastReceiver extends BroadcastReceiver {
-
-    @Override public void onReceive(Context context, Intent intent) {
-      NotificationManager notificationManager =
-          (NotificationManager) context.getSystemService(NOTIFICATION_SERVICE);
-      notificationManager.cancel(NOTIFICATION_ID);
-      final Uri uri = intent.getData();
-      final ContentResolver contentResolver = context.getContentResolver();
-      new AsyncTask<Void, Void, Void>() {
-        @Override protected Void doInBackground(@NonNull Void... none) {
-          int rowsDeleted = contentResolver.delete(uri, null, null);
-          if (rowsDeleted == 1) {
-            Timber.i("Deleted recording.");
-          } else {
-            Timber.e("Error deleting recording.");
-          }
-          return null;
-        }
-      }.execute();
     }
   }
 }

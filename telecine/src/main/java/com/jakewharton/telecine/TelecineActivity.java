@@ -19,13 +19,14 @@ import butterknife.ButterKnife;
 import butterknife.OnCheckedChanged;
 import butterknife.OnClick;
 import butterknife.OnItemSelected;
-import butterknife.OnLongClick;
 import com.google.android.gms.analytics.HitBuilders;
+import dagger.android.AndroidInjection;
+import javax.inject.Inject;
 import timber.log.Timber;
 
-import javax.inject.Inject;
-
 import static android.graphics.Bitmap.Config.ARGB_8888;
+import static android.view.View.GONE;
+import static android.view.View.VISIBLE;
 
 public final class TelecineActivity extends AppCompatActivity {
   @BindView(R.id.spinner_video_size_percentage) Spinner videoSizePercentageView;
@@ -33,6 +34,8 @@ public final class TelecineActivity extends AppCompatActivity {
   @BindView(R.id.switch_hide_from_recents) Switch hideFromRecentsView;
   @BindView(R.id.switch_recording_notification) Switch recordingNotificationView;
   @BindView(R.id.switch_show_touches) Switch showTouchesView;
+  @BindView(R.id.container_use_demo_mode) View useDemoModeContainerView;
+  @BindView(R.id.switch_use_demo_mode) Switch useDemoModeView;
   @BindView(R.id.launch) View launchView;
 
   @BindString(R.string.app_name) String appName;
@@ -43,16 +46,20 @@ public final class TelecineActivity extends AppCompatActivity {
   @Inject @HideFromRecents BooleanPreference hideFromRecentsPreference;
   @Inject @RecordingNotification BooleanPreference recordingNotificationPreference;
   @Inject @ShowTouches BooleanPreference showTouchesPreference;
+  @Inject @UseDemoMode BooleanPreference useDemoModePreference;
 
   @Inject Analytics analytics;
 
   private VideoSizePercentageAdapter videoSizePercentageAdapter;
-  private int longClickCount;
+  private DemoModeHelper.ShowDemoModeSetting showDemoModeSetting;
 
   @Override protected void onCreate(Bundle savedInstanceState) {
+    AndroidInjection.inject(this);
     super.onCreate(savedInstanceState);
 
-    ((TelecineApplication) getApplication()).inject(this);
+    if ("true".equals(getIntent().getStringExtra("crash"))) {
+      throw new RuntimeException("Crash! Bang! Pow! This is only a test...");
+    }
 
     setContentView(R.layout.activity_main);
     ButterKnife.bind(this);
@@ -71,6 +78,18 @@ public final class TelecineActivity extends AppCompatActivity {
     hideFromRecentsView.setChecked(hideFromRecentsPreference.get());
     recordingNotificationView.setChecked(recordingNotificationPreference.get());
     showTouchesView.setChecked(showTouchesPreference.get());
+    useDemoModeView.setChecked(useDemoModePreference.get());
+    showDemoModeSetting = new DemoModeHelper.ShowDemoModeSetting() {
+      @Override public void show() {
+        useDemoModeContainerView.setVisibility(VISIBLE);
+      }
+
+      @Override public void hide() {
+        useDemoModeView.setChecked(false);
+        useDemoModeContainerView.setVisibility(GONE);
+      }
+    };
+    DemoModeHelper.showDemoModeSetting(this, showDemoModeSetting);
   }
 
   @NonNull private Bitmap rasterizeTaskIcon() {
@@ -88,21 +107,8 @@ public final class TelecineActivity extends AppCompatActivity {
   }
 
   @OnClick(R.id.launch) void onLaunchClicked() {
-    if (longClickCount > 0) {
-      longClickCount = 0;
-      Timber.d("Long click count reset.");
-    }
-
     Timber.d("Attempting to acquire permission to screen capture.");
     CaptureHelper.fireScreenCaptureIntent(this, analytics);
-  }
-
-  @OnLongClick(R.id.launch) boolean onLongClick() {
-    if (++longClickCount == 5) {
-      throw new RuntimeException("Crash! Bang! Pow! This is only a test...");
-    }
-    Timber.d("Long click count updated to %s", longClickCount);
-    return true;
   }
 
   @OnItemSelected(R.id.spinner_video_size_percentage) void onVideoSizePercentageSelected(
@@ -181,8 +187,24 @@ public final class TelecineActivity extends AppCompatActivity {
     }
   }
 
+  @OnCheckedChanged(R.id.switch_use_demo_mode) void onUseDemoModeChanged() {
+    boolean newValue = useDemoModeView.isChecked();
+    boolean oldValue = useDemoModePreference.get();
+    if (newValue != oldValue) {
+      Timber.d("Use demo mode preference changing to %s", newValue);
+      useDemoModePreference.set(newValue);
+
+      analytics.send(new HitBuilders.EventBuilder() //
+          .setCategory(Analytics.CATEGORY_SETTINGS)
+          .setAction(Analytics.ACTION_CHANGE_USE_DEMO_MODE)
+          .setValue(newValue ? 1 : 0)
+          .build());
+    }
+  }
+
   @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-    if (!CaptureHelper.handleActivityResult(this, requestCode, resultCode, data, analytics)) {
+    if (!CaptureHelper.handleActivityResult(this, requestCode, resultCode, data, analytics)
+        && !DemoModeHelper.handleActivityResult(this, requestCode, showDemoModeSetting)) {
       super.onActivityResult(requestCode, resultCode, data);
     }
   }
